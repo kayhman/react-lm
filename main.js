@@ -1,84 +1,101 @@
 var h = require('virtual-dom/h')
-var main = require('main-loop')
-var loop = main({ n: 0 }, render, require('virtual-dom'))
-document.querySelector('#content').appendChild(loop.target)
+var diff = require('virtual-dom/diff');
+var patch = require('virtual-dom/patch');
+var createElement = require('virtual-dom/create-element');
 
-var event = new Event('build');
-var inc_event = new Event('increment_counter');
-
+//-- GenericModel
+function GenericModel() {
+}
 
 //-- Model
 function CounterModel() {
-    this._count = 0;
+    this._count = Math.floor((Math.random() * 1000) + 1);
+    this._id = Math.floor((Math.random() * 1000) + 1);
 }
+
+CounterModel.prototype.init = function() {
+    var model = this;
+    for(idx in this._updates) {
+	var update = this._updates[idx];
+	this.addListener(update, function (e) {
+	    model[update]();
+	});
+    }
+}
+
+CounterModel.prototype.addListener = function(event_name, listener) {
+    this.element().addEventListener(event_name, listener, false);
+}
+
+CounterModel.addUpdate = function (update_name, update) {
+    CounterModel.prototype[update_name] = function() {
+	update.call(this);
+	refresh();
+    }
+    if(! ("_updates" in CounterModel.prototype))
+	CounterModel.prototype["_updates"] = []
+    CounterModel.prototype["_updates"]. push(update_name)
+} 
 
 CounterModel.prototype.value = function() {
     return this._count;
 }
 
-var counter = new CounterModel();
+CounterModel.prototype.element = function() {
+    return document.getElementById(this._id)
+}
+
+CounterModel.prototype.address = function(event_name) {
+    this.element().dispatchEvent(new Event(event_name));
+}
 
 //-- Update
-CounterModel.prototype.increment = function() {
-    this._count = this._count + 1;
-    this.view();
-}
 
-CounterModel.prototype.decrement = function() {
+CounterModel.addUpdate("increment", function () {
+    this._count = this._count +1;
+})
+
+CounterModel.addUpdate("decrement", function () {
     this._count = this._count - 1;
-    this.view();
-}
+})
+
 
 // -- View
 CounterModel.prototype.view = function() {
-
-    return h('div', [
+    var model = this
+    return h('div', {id : this._id}, [
 	h('h1', 'counter ' + this.value() + ' times'),
 	h('button', { onclick: inc_counter }, 'inc!'),
 	h('button', { onclick: dec_counter }, 'dec!')
     ])
     function inc_counter () {
-	loop.update({ n: state.n + 1 })
+	model.address("increment");
     }
     function dec_counter () {
-	loop.update({ n: state.n + 1 })
+	model.address("decrement");
     }
-    var div = document.createElement("div");
-    var button = document.createElement("input");
-    button.type = "button";
-    button.value = "increment";
-    button.onclick = function () {
-	document.dispatchEvent(inc_event);
-    }
-    div.appendChild(button);
-    var node = document.createTextNode("Counter : " + this._count);
-    div.appendChild(node);
-    div.appendChild(button);
-    document.body.appendChild(div);
 }
 
 
-// Listen for the event.
-document.addEventListener('build', function (e) {
-    var para = document.createElement("p");
-    var node = document.createTextNode("Counter : " + counter._count);
-    para.appendChild(node);
-    document.body.appendChild(node);
-}, false);
-
-
-document.addEventListener('increment_counter', function (e) {
-    counter.increment();
-    
-}, false);
-
-//counter.view()
-
 // Dispatch the event.
-document.dispatchEvent(inc_event);
-document.dispatchEvent(event);
 
+function render (model1, model2) {
+    var tree = h('div', [model1.view(), model2.view()]); 
+    return tree
+}
 
-function render (state) {
-    counter.view();
+var model1 = new CounterModel()
+var model2 = new CounterModel()
+var tree = render(model1, model2);      // We need an initial tree
+var rootNode = createElement(tree);     // Create an initial root DOM node ...
+document.body.appendChild(rootNode);  
+
+model1.init();
+model2.init();
+
+function refresh() {
+      var newTree = render(model1, model2);
+      var patches = diff(tree, newTree);
+      rootNode = patch(rootNode, patches);
+      tree = newTree;
 }
