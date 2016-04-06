@@ -16,7 +16,7 @@ CounterModel.addUpdate("increment", function () {
 // -- View
 CounterModel.setView(function() {
     var model = this
-    var vdom = h('div', {id : this._id}, [
+    var vdom = h('div', [
 	h('h1', 'counter ' + this.getState() + ' times'),
 	h('button', { onclick: inc_counter }, 'inc!'),
 	h('button', { onclick: dec_counter }, 'dec!')
