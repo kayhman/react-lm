@@ -15,7 +15,6 @@ ClickCounterModel.addUpdate("increment", function () {
 
 // -- View
 ClickCounterModel.setView(function() {
-    var model = this
     var vdom = h('div', [
 	h('h1', 'click counter ' + this.getState() + ' times')
     ]);
