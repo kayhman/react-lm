@@ -19,12 +19,13 @@ main =
 type alias Point = {x: Float, y: Float}
 type alias Model = {t : Time,
                     points : Array Point,
-                    seed: Random.Seed}
+                    seed: Random.Seed,
+                    nbInside: Int}
 
 
 init : (Model, Cmd Msg)
 init =
-  ({t= 0, points= Array.fromList([]), seed = Random.initialSeed 31415}, Cmd.none)
+  ({t= 0, points= Array.fromList([]), seed = Random.initialSeed 31415, nbInside = 0}, Cmd.none)
 
 
 -- UPDATE
@@ -32,19 +33,28 @@ init =
 type Msg
   = Tick Time
 
+size = 100
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
   case action of
     Tick newTime ->
       let
-        (xx, seed') = Random.step (Random.float 0 100) model.seed
-        (yy, seed'') = Random.step (Random.float 0 100) seed'
+        (xx, seed') = Random.step (Random.float 0 size) model.seed
+        (yy, seed'') = Random.step (Random.float 0 size) seed'
         newPoints = Array.push {x = xx,
                                 y = yy}
                     model.points
+        nbPoints = Array.length model.points                         
+        nbInside = case Array.get (nbPoints - 1) model.points of
+                   Just p ->
+                     if insideCircle {x = (size / 2.0), y = (size / 2.0)} (size / 2.0) p then
+                       model.nbInside + 1 
+                     else
+                       model.nbInside
+                   Nothing -> model.nbInside
       in
-      ({t = newTime, points = newPoints, seed= seed''}, Cmd.none)
+      ({ t = newTime, points = newPoints, seed= seed'', nbInside = nbInside}, Cmd.none)
 
 
 -- SUBSCRIPTIONS
@@ -59,23 +69,15 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
   let
-    angle =
-      turns (Time.inMinutes model.t)
-
-    handX =
-      toString (50 + 40 * cos angle)
-
-    handY =
-      toString (50 + 40 * sin angle)
-    
+    nbPoints = Array.length model.points
+    pi = 4.0 * (toFloat model.nbInside) / (toFloat nbPoints)
   in
-    div [] [ Html.text "coucou",
-    svg [ viewBox "0 0 100 100", width "300px" ]
+    div [] [svg [ viewBox "0 0 100 100", width "300px" ]
         (List.append 
-            ([ circle [ cx "50", cy "50", r "45", fill "#0B79CE" ] [],
-                 line [ x1 "50", y1 "50", x2 handX, y2 handY, stroke "#023963" ] []
+            ([ circle [ cx (toString (size / 2)), cy (toString (size / 2)), r (toString (size / 2)), fill "#0B79CE" ] []
              ])
-           (Array.toList (pointsView model)))]
+           (Array.toList (pointsView model))),
+           Html.text (toString pi)]
 
 pointsView : Model -> Array (Svg msg)
 pointsView model =
@@ -85,3 +87,11 @@ pointsView model =
     
   in
     Array.map displayPoint model.points
+
+insideCircle : Point -> Float -> Point -> Bool
+insideCircle c r p =
+  let
+    distance c p = sqrt ((p.x - c.x) * (p.x - c.x) + (p.y - c.y )* (p.y - c.y))
+    d = distance c p
+  in 
+    d <= r
