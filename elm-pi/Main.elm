@@ -1,8 +1,8 @@
-import Html exposing (Html, div, text)
+import Html exposing (Html, div, text, br)
 import Html.App as App
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Time exposing (Time, second)
+import Time exposing (Time, second, millisecond)
 import Array exposing (Array)
 import Random
 
@@ -17,28 +17,27 @@ main =
 
 -- MODEL
 type alias Point = {x: Float, y: Float}
-type alias Model = {t : Time,
-                    points : Array Point,
+type alias Model = {points : Array Point,
                     seed: Random.Seed,
                     nbInside: Int}
 
 
 init : (Model, Cmd Msg)
 init =
-  ({t= 0, points= Array.fromList([]), seed = Random.initialSeed 31415, nbInside = 0}, Cmd.none)
+  ({points= Array.fromList([]), seed = Random.initialSeed 31415, nbInside = 0}, Cmd.none)
 
 
 -- UPDATE
 
 type Msg
-  = Tick Time
+  = AddPoint
 
-size = 100
+size = 1024
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
   case action of
-    Tick newTime ->
+    AddPoint ->
       let
         (xx, seed') = Random.step (Random.float 0 size) model.seed
         (yy, seed'') = Random.step (Random.float 0 size) seed'
@@ -54,14 +53,14 @@ update action model =
                        model.nbInside
                    Nothing -> model.nbInside
       in
-      ({ t = newTime, points = newPoints, seed= seed'', nbInside = nbInside}, Cmd.none)
+      ({points = newPoints, seed= seed'', nbInside = nbInside}, Cmd.none)
 
 
 -- SUBSCRIPTIONS
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Time.every second Tick
+  Time.every millisecond (\t -> AddPoint)
 
 
 -- VIEW
@@ -72,12 +71,14 @@ view model =
     nbPoints = Array.length model.points
     pi = 4.0 * (toFloat model.nbInside) / (toFloat nbPoints)
   in
-    div [] [svg [ viewBox "0 0 100 100", width "300px" ]
+    div [] [svg [ viewBox ("0 0 " ++ (toString size) ++ " " ++ (toString size)), width ((toString (1 * size)) ++ "px") ]
         (List.append 
             ([ circle [ cx (toString (size / 2)), cy (toString (size / 2)), r (toString (size / 2)), fill "#0B79CE" ] []
              ])
            (Array.toList (pointsView model))),
-           Html.text (toString pi)]
+           Html.text (toString pi), Html.br [] [],
+           Html.text (toString model.nbInside), Html.br [] [],
+           Html.text (toString nbPoints)]
 
 pointsView : Model -> Array (Svg msg)
 pointsView model =
@@ -87,6 +88,8 @@ pointsView model =
     
   in
     Array.map displayPoint model.points
+
+-- helper
 
 insideCircle : Point -> Float -> Point -> Bool
 insideCircle c r p =
